@@ -1,0 +1,9 @@
+{
+  "name": "schema",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "convex": "^1.31.7",
+    "@convex-dev/auth": "^0.0.90"
+  }
+}
