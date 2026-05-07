@@ -108,3 +108,27 @@ export const disapproveUser = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Bootstrap: self-approve and promote to admin if no admins exist yet.
+ * Allows the first user to become admin without requiring an existing admin.
+ */
+export const bootstrapFirstAdmin = mutation({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const allUsers = await ctx.db.query("users").collect();
+    const hasAdmin = allUsers.some((u) => u.isAdmin === true);
+
+    if (hasAdmin) {
+      throw new Error("An admin already exists. Ask an admin to approve your account.");
+    }
+
+    await ctx.db.patch(userId, { approved: true, isAdmin: true });
+
+    return { success: true, userId };
+  },
+});
