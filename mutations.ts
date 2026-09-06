@@ -184,6 +184,109 @@ export const setCurrentHeat = mutation({
     return args.id;
   },
 });
+export const startHeat = mutation({
+  args: {
+    heat: v.number(),
+    date: v.string(),
+    team_a_id: v.id("teams"),
+    player_a_id: v.id("players"),
+    team_b_id: v.id("teams"),
+    player_b_id: v.id("players"),
+  },
+  handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
+
+    const [teamA, playerA, teamB, playerB] = await Promise.all([
+      ctx.db.get(args.team_a_id),
+      ctx.db.get(args.player_a_id),
+      ctx.db.get(args.team_b_id),
+      ctx.db.get(args.player_b_id),
+    ]);
+    const sailType = await ctx.db
+      .query("time_types")
+      .withIndex("by_time_eng", (q) => q.eq("time_eng", "Sail"))
+      .first();
+
+    if (!teamA || !playerA || !teamB || !playerB || !sailType) {
+      throw new Error(
+        "Selected teams, players, and Sail time type are required",
+      );
+    }
+    if (
+      args.team_a_id === args.team_b_id ||
+      args.player_a_id === args.player_b_id
+    ) {
+      throw new Error("Teams and players must be different");
+    }
+
+    const teamAPlayers = [
+      teamA.player_1_id,
+      teamA.player_2_id,
+      teamA.player_3_id,
+      teamA.player_4_id,
+    ];
+    const teamBPlayers = [
+      teamB.player_1_id,
+      teamB.player_2_id,
+      teamB.player_3_id,
+      teamB.player_4_id,
+    ];
+    if (
+      !teamAPlayers.includes(args.player_a_id) ||
+      !teamBPlayers.includes(args.player_b_id)
+    ) {
+      throw new Error("Selected players must belong to their teams");
+    }
+
+    const currentHeats = await ctx.db
+      .query("heats")
+      .withIndex("by_is_current", (q) => q.eq("is_current", true))
+      .collect();
+
+    const maybeNow = "now" in ctx ? ctx.now : undefined;
+    const now = maybeNow instanceof Date ? maybeNow : new Date();
+    const timeSeconds =
+      now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const timeString = now.toLocaleTimeString("en-GB", { hour12: false });
+
+    for (const currentHeat of currentHeats) {
+      await ctx.db.patch(currentHeat._id, { is_current: false });
+    }
+
+    const name = `Heat ${args.heat}`;
+    const heatId = await ctx.db.insert("heats", {
+      name,
+      heat: args.heat,
+      date: args.date,
+      is_current: true,
+    });
+
+    await ctx.db.insert("time_logs", {
+      player_id: args.player_a_id,
+      team_id: args.team_a_id,
+      heat_id: heatId,
+      time_type_id: sailType._id,
+      time_seconds: timeSeconds,
+      time: timeString,
+    });
+    await ctx.db.insert("time_logs", {
+      player_id: args.player_b_id,
+      team_id: args.team_b_id,
+      heat_id: heatId,
+      time_type_id: sailType._id,
+      time_seconds: timeSeconds,
+      time: timeString,
+    });
+
+    return {
+      id: heatId,
+      name,
+      heat: args.heat,
+      date: args.date,
+      is_current: true as const,
+    };
+  },
+});
 
 // ============ TIME TYPE MUTATIONS ============
 
