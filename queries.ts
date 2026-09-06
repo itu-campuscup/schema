@@ -1,4 +1,5 @@
-import { query } from "./_generated/server";
+import { internalQuery, query } from "./_generated/server";
+import { requireApprovedUser } from "./authHelpers";
 import { v } from "convex/values";
 
 /**
@@ -12,6 +13,7 @@ import { v } from "convex/values";
 export const getPlayers = query({
   args: {},
   handler: async (ctx) => {
+    await requireApprovedUser(ctx);
     return await ctx.db.query("players").collect();
   },
 });
@@ -20,6 +22,7 @@ export const getPlayers = query({
 export const getPlayer = query({
   args: { id: v.id("players") },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     return await ctx.db.get(args.id);
   },
 });
@@ -28,6 +31,7 @@ export const getPlayer = query({
 export const getPlayersByTeam = query({
   args: { team_id: v.id("teams") },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     const team = await ctx.db.get(args.team_id);
     if (!team) return [];
     const playerIds = [
@@ -49,6 +53,7 @@ export const getPlayersByTeam = query({
 export const getTeams = query({
   args: {},
   handler: async (ctx) => {
+    await requireApprovedUser(ctx);
     return await ctx.db.query("teams").collect();
   },
 });
@@ -57,6 +62,7 @@ export const getTeams = query({
 export const getActiveTeams = query({
   args: {},
   handler: async (ctx) => {
+    await requireApprovedUser(ctx);
     return await ctx.db
       .query("teams")
       .filter((q) =>
@@ -73,6 +79,7 @@ export const getActiveTeams = query({
 export const getTeam = query({
   args: { id: v.id("teams") },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     return await ctx.db.get(args.id);
   },
 });
@@ -81,6 +88,7 @@ export const getTeam = query({
 export const getHeats = query({
   args: {},
   handler: async (ctx) => {
+    await requireApprovedUser(ctx);
     return await ctx.db.query("heats").order("desc").collect();
   },
 });
@@ -89,6 +97,7 @@ export const getHeats = query({
 export const getCurrentHeat = query({
   args: {},
   handler: async (ctx) => {
+    await requireApprovedUser(ctx);
     const heats = await ctx.db
       .query("heats")
       .withIndex("by_is_current", (q) => q.eq("is_current", true))
@@ -101,6 +110,7 @@ export const getCurrentHeat = query({
 export const getHeatsByYear = query({
   args: { year: v.number() },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     const allHeats = await ctx.db.query("heats").collect();
     return allHeats.filter((heat) => {
       const heatYear = new Date(heat.date).getFullYear();
@@ -113,6 +123,7 @@ export const getHeatsByYear = query({
 export const getTimeTypes = query({
   args: {},
   handler: async (ctx) => {
+    await requireApprovedUser(ctx);
     return await ctx.db.query("time_types").collect();
   },
 });
@@ -121,6 +132,7 @@ export const getTimeTypes = query({
 export const getTimeTypeByName = query({
   args: { name: v.string() },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     const types = await ctx.db
       .query("time_types")
       .withIndex("by_name", (q) => q.eq("name", args.name))
@@ -133,6 +145,7 @@ export const getTimeTypeByName = query({
 export const getTimeLogs = query({
   args: {},
   handler: async (ctx) => {
+    await requireApprovedUser(ctx);
     return await ctx.db.query("time_logs").collect();
   },
 });
@@ -141,6 +154,7 @@ export const getTimeLogs = query({
 export const getTimeLogsByHeat = query({
   args: { heatId: v.id("heats") },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     return await ctx.db
       .query("time_logs")
       .withIndex("by_heat", (q) => q.eq("heat_id", args.heatId))
@@ -152,6 +166,7 @@ export const getTimeLogsByHeat = query({
 export const getTimeLogsByPlayer = query({
   args: { playerId: v.id("players") },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     return await ctx.db
       .query("time_logs")
       .withIndex("by_player", (q) => q.eq("player_id", args.playerId))
@@ -163,6 +178,7 @@ export const getTimeLogsByPlayer = query({
 export const getTimeLogsByTeam = query({
   args: { teamId: v.id("teams") },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     return await ctx.db
       .query("time_logs")
       .withIndex("by_team", (q) => q.eq("team_id", args.teamId))
@@ -177,6 +193,7 @@ export const getTimeLogsByHeatAndType = query({
     timeTypeId: v.id("time_types"),
   },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     return await ctx.db
       .query("time_logs")
       .withIndex("by_heat_and_type", (q) =>
@@ -193,11 +210,27 @@ export const getTimeLogsByTeamAndHeat = query({
     heatId: v.id("heats"),
   },
   handler: async (ctx, args) => {
+    await requireApprovedUser(ctx);
     return await ctx.db
       .query("time_logs")
       .withIndex("by_team_and_heat", (q) =>
         q.eq("team_id", args.teamId).eq("heat_id", args.heatId),
       )
       .collect();
+  },
+});
+
+// Gather all competition data for the authenticated stats export.
+export const exportStatsData = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const [players, teams, heats, timeTypes, timeLogs] = await Promise.all([
+      ctx.db.query("players").collect(),
+      ctx.db.query("teams").collect(),
+      ctx.db.query("heats").order("desc").collect(),
+      ctx.db.query("time_types").collect(),
+      ctx.db.query("time_logs").collect(),
+    ]);
+    return { players, teams, heats, timeTypes, timeLogs };
   },
 });
