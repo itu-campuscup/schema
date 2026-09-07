@@ -261,8 +261,8 @@ describe("startHeat mutation", () => {
         }),
       ]),
     );
-    expect(typeof timeLogInserts[0]?.value.time_seconds).toBe("number");
-    expect(typeof timeLogInserts[0]?.value.time).toBe("string");
+    expect(timeLogInserts[0]?.value.time_seconds % 1).toBeCloseTo(0.999);
+    expect(timeLogInserts[0]?.value.time).toMatch(/\.999$/);
     expect(timeLogInserts[0]?.value.time_seconds).toBe(
       timeLogInserts[1]?.value.time_seconds,
     );

@@ -10,6 +10,27 @@ import { requireApprovedUser } from "./authHelpers";
  * All mutations require the user to be authenticated and approved by an admin.
  */
 
+const timestampFor = (context: unknown) => {
+  const maybeNow =
+    context && typeof context === "object" && "now" in context
+      ? context.now
+      : undefined;
+  const now = maybeNow instanceof Date ? maybeNow : new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const seconds = now.getSeconds();
+  const milliseconds = now.getMilliseconds();
+  const timeSeconds =
+    hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
+  const timeString = `${String(hours).padStart(2, "0")}:${String(
+    minutes,
+  ).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(
+    milliseconds,
+  ).padStart(3, "0")}`;
+
+  return { timeSeconds, timeString };
+};
+
 // ============ PLAYER MUTATIONS ============
 
 export const createPlayer = mutation({
@@ -242,12 +263,7 @@ export const startHeat = mutation({
       .query("heats")
       .withIndex("by_is_current", (q) => q.eq("is_current", true))
       .collect();
-
-    const maybeNow = "now" in ctx ? ctx.now : undefined;
-    const now = maybeNow instanceof Date ? maybeNow : new Date();
-    const timeSeconds =
-      now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-    const timeString = now.toLocaleTimeString("en-GB", { hour12: false });
+    const { timeSeconds, timeString } = timestampFor(ctx);
 
     for (const currentHeat of currentHeats) {
       await ctx.db.patch(currentHeat._id, { is_current: false });
@@ -260,7 +276,6 @@ export const startHeat = mutation({
       date: args.date,
       is_current: true,
     });
-
     await ctx.db.insert("time_logs", {
       player_id: args.player_a_id,
       team_id: args.team_a_id,
@@ -339,12 +354,7 @@ export const createTimeLog = mutation({
   handler: async (ctx, args) => {
     await requireApprovedUser(ctx);
 
-    // Use Convex/server time so timestamps are authoritative and consistent across clients
-    const maybeNow = (ctx as { now?: unknown }).now;
-    const now = maybeNow instanceof Date ? maybeNow : new Date();
-    const timeSeconds =
-      now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-    const timeString = now.toLocaleTimeString("en-GB", { hour12: false });
+    const { timeSeconds, timeString } = timestampFor(ctx);
 
     const logId = await ctx.db.insert("time_logs", {
       ...args,
@@ -397,12 +407,7 @@ export const createTimeLogsBatch = mutation({
   handler: async (ctx, args) => {
     await requireApprovedUser(ctx);
 
-    // Compute a single server-side timestamp to use for any logs that don't supply one.
-    const maybeNow = (ctx as { now?: unknown }).now;
-    const now = maybeNow instanceof Date ? maybeNow : new Date();
-    const seconds =
-      now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-    const timeString = now.toLocaleTimeString("en-GB", { hour12: false });
+    const { timeSeconds, timeString } = timestampFor(ctx);
 
     const ids = [];
     for (const log of args.logs) {
@@ -411,7 +416,7 @@ export const createTimeLogsBatch = mutation({
         team_id: log.team_id,
         heat_id: log.heat_id,
         time_type_id: log.time_type_id,
-        time_seconds: seconds,
+        time_seconds: timeSeconds,
         time: timeString,
       };
       const id = await ctx.db.insert("time_logs", insertPayload);
