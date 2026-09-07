@@ -78,7 +78,7 @@ export default defineSchema({
     heat_id: v.id("heats"),
     time_type_id: v.id("time_types"),
     time_seconds: v.number(),
-    time: v.optional(v.string()), // Formatted time string "HH:MM:SS"
+    time: v.optional(v.string()), // Formatted time string "HH:MM:SS.mmm"
   })
     .index("by_player", ["player_id"])
     .index("by_team", ["team_id"])
