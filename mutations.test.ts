@@ -11,7 +11,6 @@ type TableName =
 type Row = { _id: string; [key: string]: unknown };
 
 type StartHeatArgs = {
-  heat: number;
   date: string;
   team_a_id: string;
   player_a_id: string;
@@ -78,7 +77,6 @@ type StartHeatMutation = {
 };
 
 const args: StartHeatArgs = {
-  heat: 3,
   date: "2026-09-06",
   team_a_id: "teams_a",
   player_a_id: "players_a",
@@ -232,14 +230,14 @@ describe("startHeat mutation", () => {
     expect(heatInserts).toHaveLength(1);
     expect(heatInserts[0]?.value).toEqual({
       name: "Heat 3",
-      heat: args.heat,
+      heat: 3,
       date: args.date,
       is_current: true,
     });
     expect(result).toEqual({
       id: heatInserts[0]?.id,
       name: "Heat 3",
-      heat: args.heat,
+      heat: 3,
       date: args.date,
       is_current: true,
     });
@@ -267,6 +265,21 @@ describe("startHeat mutation", () => {
       timeLogInserts[1]?.value.time_seconds,
     );
     expect(timeLogInserts[0]?.value.time).toBe(timeLogInserts[1]?.value.time);
+  });
+
+  test("starts a new calendar year at heat 1", async () => {
+    const startHeat = await loadStartHeat();
+    const fixture = makeFixture();
+    const previousHeat = fixture.data.heats[0]!;
+    previousHeat.heat = 16;
+    previousHeat.date = "2025-09-06";
+
+    const result = (await startHeat._handler(fixture, {
+      ...args,
+      date: "2026-01-01",
+    })) as StartHeatResult;
+
+    expect(result.heat).toBe(1);
   });
 
   test("rejects a missing Sail type before any writes", async () => {

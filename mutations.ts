@@ -207,7 +207,6 @@ export const setCurrentHeat = mutation({
 });
 export const startHeat = mutation({
   args: {
-    heat: v.number(),
     date: v.string(),
     team_a_id: v.id("teams"),
     player_a_id: v.id("players"),
@@ -259,6 +258,17 @@ export const startHeat = mutation({
       throw new Error("Selected players must belong to their teams");
     }
 
+    const heatsForYear = await ctx.db.query("heats").collect();
+    const yearPrefix = `${args.date.slice(0, 4)}-`;
+    const heat =
+      heatsForYear
+        .filter((existingHeat) => existingHeat.date.startsWith(yearPrefix))
+        .reduce(
+          (highestHeat, existingHeat) =>
+            Math.max(highestHeat, existingHeat.heat),
+          0,
+        ) + 1;
+
     const currentHeats = await ctx.db
       .query("heats")
       .withIndex("by_is_current", (q) => q.eq("is_current", true))
@@ -269,10 +279,10 @@ export const startHeat = mutation({
       await ctx.db.patch(currentHeat._id, { is_current: false });
     }
 
-    const name = `Heat ${args.heat}`;
+    const name = `Heat ${heat}`;
     const heatId = await ctx.db.insert("heats", {
       name,
-      heat: args.heat,
+      heat,
       date: args.date,
       is_current: true,
     });
@@ -296,7 +306,7 @@ export const startHeat = mutation({
     return {
       id: heatId,
       name,
-      heat: args.heat,
+      heat,
       date: args.date,
       is_current: true as const,
     };
