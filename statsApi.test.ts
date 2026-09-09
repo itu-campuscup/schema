@@ -23,12 +23,12 @@ type StatsApiAction = {
 async function loadStatsApi(): Promise<StatsApiAction> {
   process.env.STATS_API_KEY = "stats-test-key";
   // Dynamic loading makes a missing protected stats endpoint fail as a test assertion.
-  const module = (await import("./statsApi")) as {
+  const statsApiModule = (await import("./statsApi")) as {
     getStatsData?: StatsApiAction;
   };
 
-  expect(module.getStatsData).toBeDefined();
-  return module.getStatsData as StatsApiAction;
+  expect(statsApiModule.getStatsData).toBeDefined();
+  return statsApiModule.getStatsData as StatsApiAction;
 }
 
 describe("getStatsData", () => {
